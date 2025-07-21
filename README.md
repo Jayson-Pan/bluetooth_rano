@@ -1,16 +1,5 @@
-# bluetooth_rano
+# QTsteam Hub
 
-A bluetooth PJ
+- 简介
 
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+一个蓝牙调试器项目，使用flutter进行开发。后续将添加更多功能，现支持蓝牙的发现、发送、接收，在项目在android端和web端进行测试，尚未在其他平台进行测试。

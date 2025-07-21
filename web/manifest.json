@@ -1,11 +1,11 @@
 {
-    "name": "bluetooth_rano",
-    "short_name": "bluetooth_rano",
+    "name": "QTsteam Hub",
+    "short_name": "QTsteam Hub",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A bluetooth PJ",
+    "description": "QTsteam Hub - A modern Bluetooth application",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
