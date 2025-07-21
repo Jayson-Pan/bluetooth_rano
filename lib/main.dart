@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'bluetooth_discovery_page.dart';
-import 'bluetooth_communication_page.dart';
+import 'hub_page.dart';
 
 void main() {
-  runApp(const BluetoothApp());
+  runApp(const QTsteamHubApp());
 }
 
-class BluetoothApp extends StatelessWidget {
-  const BluetoothApp({super.key});
+class QTsteamHubApp extends StatelessWidget {
+  const QTsteamHubApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'BLE蓝牙控制应用',
+      title: 'QTsteam Hub',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
@@ -34,7 +34,7 @@ class _MainPageState extends State<MainPage> {
   
   final List<Widget> _pages = [
     const BluetoothDiscoveryPage(),
-    const BluetoothCommunicationPage(),
+    const HubPage(),
   ];
 
   @override
@@ -58,8 +58,8 @@ class _MainPageState extends State<MainPage> {
             label: 'BLE发现',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.message),
-            label: 'BLE通信',
+            icon: Icon(Icons.hub),
+            label: 'HUB',
           ),
         ],
       ),
