@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'bluetooth_service.dart';
+import 'settings_manager.dart';
 import 'dart:async';
 
 class BluetoothRobotFighterPage extends StatefulWidget {
@@ -31,21 +32,7 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
   ];
   
   // 按钮命令映射
-  Map<String, String> _buttonCommands = {
-    'up': 'F',
-    'down': 'B',
-    'left': 'L',
-    'right': 'R',
-    'f1': '1',
-    'f2': '2',
-    'f3': '3',
-    'f4': '4',
-    'f5': '5',
-    'f6': '6',
-    'f7': '7',
-    'f8': '8',
-    'f9': '9',
-  };
+  Map<String, String> _buttonCommands = {};
 
   @override
   void initState() {
@@ -54,6 +41,61 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
     _listenToConnectionState();
     _updateConnectionState();
     _initBackgroundCarousel();
+    _loadSettings();
+  }
+
+  // 加载保存的设置
+  void _loadSettings() async {
+    final commands = await SettingsManager.loadRobotFighterSettings();
+    if (mounted) {
+      setState(() {
+        _buttonCommands = commands;
+      });
+    }
+  }
+
+  // 保存设置
+  void _saveSettings() async {
+    await SettingsManager.saveRobotFighterSettings(_buttonCommands);
+  }
+
+  // 恢复默认设置
+  void _resetToDefaults() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('恢复默认设置'),
+        content: const Text('确定要将所有按钮恢复为默认设置吗？\n\n此操作将清除您的所有自定义按钮命令。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await SettingsManager.resetRobotFighterSettings();
+              final defaultCommands = SettingsManager.getDefaultCommands();
+              setState(() {
+                _buttonCommands = defaultCommands;
+              });
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('已恢复默认设置'),
+                  duration: Duration(seconds: 2),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('确定恢复'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -209,13 +251,53 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
               setState(() {
                 _buttonCommands[buttonKey] = controller.text;
               });
+              _saveSettings(); // 保存到本地存储
               Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('按钮 ${buttonKey.toUpperCase()} 的命令已保存'),
+                  duration: Duration(seconds: 2),
+                  backgroundColor: Colors.green,
+                ),
+              );
             },
             child: const Text('确定'),
           ),
         ],
       ),
     );
+  }
+
+  // 跳转到竖屏自定义界面
+  void _openCustomizeScreen() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CustomizeButtonsScreen(
+          buttonCommands: Map.from(_buttonCommands),
+          isConnected: _isConnected,
+        ),
+      ),
+    );
+    
+    // 确保返回时是横屏
+    await Future.delayed(const Duration(milliseconds: 200));
+    if (mounted) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
+    
+    if (result != null && result is Map<String, String>) {
+      // 延迟更新状态，等待屏幕方向稳定
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (mounted) {
+        setState(() {
+          _buttonCommands = result;
+        });
+      }
+    }
   }
 
   // 显示操作指南
@@ -235,9 +317,9 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
               Text('• F1-F9按钮默认发送1-9字符'),
               SizedBox(height: 12),
               Text('⚙️ 自定义模式：', style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('• 开启"按钮自定义"模式'),
-              Text('• 点击任意按钮编辑发送命令'),
-              Text('• 可以预览每个按钮的命令'),
+              Text('• 点击"按钮自定义"进入竖屏编辑模式'),
+              Text('• 在竖屏模式下编辑每个按钮的命令'),
+              Text('• 完成后自动返回横屏操作界面'),
               SizedBox(height: 12),
               Text('🔗 连接要求：', style: TextStyle(fontWeight: FontWeight.bold)),
               Text('• 需要先在"BLE发现"页面连接设备'),
@@ -262,6 +344,7 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false, // 避免键盘影响布局
       body: Stack(
         children: [
           // 轮播背景
@@ -404,46 +487,59 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
         
         const Spacer(),
         
+        // 恢复默认按钮
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: IconButton(
+            onPressed: _resetToDefaults,
+            icon: const Icon(Icons.restore, size: 16),
+            color: Colors.white,
+            padding: const EdgeInsets.all(8),
+            constraints: const BoxConstraints(
+              minWidth: 40,
+              minHeight: 40,
+            ),
+          ),
+        ),
+        
+        const SizedBox(width: 8),
+        
         // 操作指南按钮
         Container(
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(20),
           ),
-          child: ElevatedButton.icon(
+          child: IconButton(
             onPressed: _showGuide,
             icon: const Icon(Icons.help_outline, size: 16),
-            label: const Text('操作指南'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            color: Colors.white,
+            padding: const EdgeInsets.all(8),
+            constraints: const BoxConstraints(
+              minWidth: 40,
+              minHeight: 40,
             ),
           ),
         ),
         
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
         
         // 按钮自定义切换
         Container(
           decoration: BoxDecoration(
-            color: _isCustomizeMode 
-              ? Colors.amber.withValues(alpha: 0.9) // 金黄色作为红色主题的反差色
-              : Colors.black.withValues(alpha: 0.3),
+            color: Colors.amber.withValues(alpha: 0.9), // 金黄色作为红色主题的反差色
             borderRadius: BorderRadius.circular(20),
           ),
           child: ElevatedButton.icon(
-            onPressed: () {
-              setState(() {
-                _isCustomizeMode = !_isCustomizeMode;
-              });
-            },
-            icon: Icon(
-              _isCustomizeMode ? Icons.edit : Icons.edit_outlined,
+            onPressed: _openCustomizeScreen,
+            icon: const Icon(
+              Icons.edit,
               size: 16,
             ),
-            label: Text(_isCustomizeMode ? '自定义中' : '按钮自定义'),
+            label: const Text('按钮自定义'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,
               foregroundColor: Colors.white,
@@ -664,4 +760,348 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
       ),
     );
   }
-} 
+}
+
+// 竖屏按钮自定义界面
+class CustomizeButtonsScreen extends StatefulWidget {
+  final Map<String, String> buttonCommands;
+  final bool isConnected;
+
+  const CustomizeButtonsScreen({
+    super.key,
+    required this.buttonCommands,
+    required this.isConnected,
+  });
+
+  @override
+  State<CustomizeButtonsScreen> createState() => _CustomizeButtonsScreenState();
+}
+
+class _CustomizeButtonsScreenState extends State<CustomizeButtonsScreen> {
+  late Map<String, String> _buttonCommands;
+
+  // 按钮信息映射
+  final Map<String, Map<String, dynamic>> _buttonInfo = {
+    'up': {'label': '上 ↑', 'icon': Icons.keyboard_arrow_up, 'description': '向上移动'},
+    'down': {'label': '下 ↓', 'icon': Icons.keyboard_arrow_down, 'description': '向下移动'},
+    'left': {'label': '左 ←', 'icon': Icons.keyboard_arrow_left, 'description': '向左移动'},
+    'right': {'label': '右 →', 'icon': Icons.keyboard_arrow_right, 'description': '向右移动'},
+    'f1': {'label': 'F1', 'icon': Icons.looks_one, 'description': '功能键1'},
+    'f2': {'label': 'F2', 'icon': Icons.looks_two, 'description': '功能键2'},
+    'f3': {'label': 'F3', 'icon': Icons.looks_3, 'description': '功能键3'},
+    'f4': {'label': 'F4', 'icon': Icons.looks_4, 'description': '功能键4'},
+    'f5': {'label': 'F5', 'icon': Icons.looks_5, 'description': '功能键5'},
+    'f6': {'label': 'F6', 'icon': Icons.looks_6, 'description': '功能键6'},
+    'f7': {'label': 'F7', 'icon': Icons.filter_7, 'description': '功能键7'},
+    'f8': {'label': 'F8', 'icon': Icons.filter_8, 'description': '功能键8'},
+    'f9': {'label': 'F9', 'icon': Icons.filter_9, 'description': '功能键9'},
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _buttonCommands = Map.from(widget.buttonCommands);
+    // 设置竖屏
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  }
+
+  @override
+  void dispose() {
+    // 立即恢复横屏，但使用Future.microtask避免在dispose过程中的冲突
+    Future.microtask(() {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    });
+    super.dispose();
+  }
+
+  void _editButton(String buttonKey) {
+    TextEditingController controller = TextEditingController(
+      text: _buttonCommands[buttonKey] ?? '',
+    );
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('编辑 ${_buttonInfo[buttonKey]?['label'] ?? buttonKey}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '功能：${_buttonInfo[buttonKey]?['description'] ?? '自定义功能'}',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: '发送命令',
+                hintText: '输入要发送的字符串',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _buttonCommands[buttonKey] = controller.text;
+              });
+              // 保存到本地存储
+              SettingsManager.saveRobotFighterSettings(_buttonCommands);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('按钮 ${_buttonInfo[buttonKey]?['label'] ?? buttonKey} 的命令已保存'),
+                  duration: Duration(seconds: 2),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WillPopScope(
+      onWillPop: () async {
+        // 在返回前确保屏幕方向设置正确
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ]);
+        // 短暂延迟确保方向变化开始
+        await Future.delayed(const Duration(milliseconds: 50));
+        return true;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+        title: const Text('按钮自定义'),
+        backgroundColor: const Color(0xFFDC2626),
+        foregroundColor: Colors.white,
+        actions: [
+          // 连接状态指示
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: widget.isConnected 
+                ? Colors.green.withValues(alpha: 0.2) 
+                : Colors.red.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: widget.isConnected ? Colors.green : Colors.red,
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  widget.isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+                  size: 14,
+                  color: widget.isConnected ? Colors.green : Colors.red,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  widget.isConnected ? '已连接' : '未连接',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: widget.isConnected ? Colors.green : Colors.red,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        leading: IconButton(
+          onPressed: () {
+            Navigator.pop(context, _buttonCommands);
+          },
+          icon: const Icon(Icons.arrow_back),
+        ),
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFDC2626), // 红色
+              Color(0xFFB91C1C), // 深红色
+              Color(0xFF991B1B), // 更深红色
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // 说明文字
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '🎮 按钮自定义说明',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        '• 点击下方按钮可编辑发送的命令\n• 支持单个字符或字符串\n• 编辑完成后点击返回按钮保存',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // 按钮列表
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _buttonInfo.length,
+                    itemBuilder: (context, index) {
+                      String buttonKey = _buttonInfo.keys.elementAt(index);
+                      Map<String, dynamic> info = _buttonInfo[buttonKey]!;
+                      String command = _buttonCommands[buttonKey] ?? '';
+                      
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: Material(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          borderRadius: BorderRadius.circular(12),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () => _editButton(buttonKey),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  // 按钮图标
+                                  Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFDC2626),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Icon(
+                                      info['icon'],
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                  ),
+                                  
+                                  const SizedBox(width: 16),
+                                  
+                                  // 按钮信息
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          info['label'],
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          info['description'],
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                        if (command.isNotEmpty) ...[
+                                          const SizedBox(height: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blue.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(
+                                                color: Colors.blue.withValues(alpha: 0.3),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              '命令: $command',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.blue,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  
+                                  // 编辑图标
+                                  Icon(
+                                    Icons.edit,
+                                    color: Colors.grey[400],
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+                  ),
+        ),
+      ),
+    );
+  }
+}

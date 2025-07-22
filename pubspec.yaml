@@ -40,6 +40,9 @@ dependencies:
   
   # 权限管理库
   permission_handler: ^11.3.1
+  
+  # 本地存储库 - 用于保存用户设置
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:

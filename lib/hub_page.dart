@@ -16,7 +16,7 @@ class HubPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           _buildHubItem(
             context,
             imagePath: 'assets/images/ble_debug.png',
@@ -32,7 +32,7 @@ class HubPage extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           _buildHubItem(
             context,
             imagePath: 'assets/images/car_series.png',
@@ -48,7 +48,7 @@ class HubPage extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           _buildHubItem(
             context,
             imagePath: 'assets/images/robot_fighter.png',
@@ -64,7 +64,7 @@ class HubPage extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           _buildHubItem(
             context,
             imagePath: 'assets/images/stacking_robot.png',
@@ -90,38 +90,39 @@ class HubPage extends StatelessWidget {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.grey.shade200),
           boxShadow: [
             BoxShadow(
               color: Colors.grey.shade200,
-              blurRadius: 8,
+              blurRadius: 6,
               offset: const Offset(0, 2),
             ),
           ],
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 左侧图片/图标区域 - 调整为适中大小
+            // 左侧图片/图标区域 - 减小尺寸
             Container(
-              width: 100,
-              height: 100,
+              width: 70,
+              height: 70,
               decoration: BoxDecoration(
                 color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.grey.shade200),
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
                 child: _buildImageWidget(imagePath, fallbackIcon),
               ),
             ),
-                              const SizedBox(width: 16),
+            const SizedBox(width: 12),
             
             // 右侧文字内容
             Expanded(
@@ -131,38 +132,38 @@ class HubPage extends StatelessWidget {
                   Text(
                     title,
                     style: const TextStyle(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     description,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       color: Colors.grey.shade600,
-                      height: 1.3,
+                      height: 1.4,
                     ),
-                    maxLines: 5,
+                    maxLines: 4,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
             
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             
             // 右侧箭头
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6),
               ),
               child: Icon(
                 Icons.arrow_forward_ios,
-                size: 16,
+                size: 14,
                 color: Colors.blue.shade600,
               ),
             ),
@@ -175,21 +176,21 @@ class HubPage extends StatelessWidget {
   Widget _buildImageWidget(String imagePath, IconData fallbackIcon) {
     return Image.asset(
       imagePath,
-      width: 100,
-      height: 100,
+      width: 70,
+      height: 70,
       fit: BoxFit.cover,
       errorBuilder: (context, error, stackTrace) {
         // 如果图片加载失败，显示备用图标
         return Container(
-          width: 100,
-          height: 100,
+          width: 70,
+          height: 70,
           decoration: BoxDecoration(
             color: Colors.blue.shade100,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
             fallbackIcon,
-            size: 50,
+            size: 36,
             color: Colors.blue.shade700,
           ),
         );
