@@ -290,7 +290,7 @@ class _BluetoothCarSeriesPageState extends State<BluetoothCarSeriesPage> {
             icon: Icon(Icons.save, size: 18),
             label: const Text('保存'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
+              backgroundColor: Colors.purple.shade300,
               foregroundColor: Colors.white,
             ),
           ),
@@ -781,18 +781,18 @@ class _BluetoothCarSeriesPageState extends State<BluetoothCarSeriesPage> {
             : _isCustomizeMode 
               ? Colors.orange.withValues(alpha: 0.8)
               : (hasCommand && _isConnected 
-                ? Colors.blue.withValues(alpha: 0.8) 
+                ? Colors.purple.shade200.withValues(alpha: 0.8) 
                 : Colors.black.withValues(alpha: 0.4)),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isPressed 
-              ? Colors.blue.withValues(alpha: 0.8)
-              : Colors.white.withValues(alpha: 0.3),
-            width: isPressed ? 3 : 2,
-          ),
+                      border: Border.all(
+              color: isPressed 
+                ? Colors.purple.shade300.withValues(alpha: 0.8)
+                : Colors.white.withValues(alpha: 0.3),
+              width: isPressed ? 3 : 2,
+            ),
           boxShadow: isPressed ? [
             BoxShadow(
-              color: Colors.blue.withValues(alpha: 0.5),
+              color: Colors.purple.shade300.withValues(alpha: 0.5),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -830,16 +830,16 @@ class _BluetoothCarSeriesPageState extends State<BluetoothCarSeriesPage> {
                 if (icon != null) ...[
                   Icon(
                     icon,
-                    color: isPressed ? Colors.blue.shade700 : Colors.white,
+                    color: isPressed ? Colors.purple.shade700 : Colors.white,
                     size: isDirectional ? 30 : 14, // 进一步增加方向按键箭头图标尺寸
                   ),
                   const SizedBox(height: 1),
                 ],
                 Flexible(
-                  child: Text(
+                  child:                   Text(
                     label,
                     style: TextStyle(
-                      color: isPressed ? Colors.blue.shade700 : Colors.white,
+                      color: isPressed ? Colors.purple.shade700 : Colors.white,
                       fontSize: isDirectional ? 12 : (icon == null ? 12 : 8), // 减小F1-F9按钮字体大小
                       fontWeight: FontWeight.bold,
                     ),
