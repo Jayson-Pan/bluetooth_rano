@@ -1,10 +1,63 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:qtsteam_hub/bluetooth_discovery_page.dart';
+import 'package:qtsteam_hub/bluetooth_service.dart';
 import 'bluetooth_communication_page.dart';
 import 'bluetooth_car_series_page.dart';
 import 'bluetooth_robot_fighter_page.dart';
 
-class HubPage extends StatelessWidget {
+class HubPage extends StatefulWidget {
   const HubPage({super.key});
+
+  @override
+  State<HubPage> createState() => _HubPageState();
+}
+
+class _HubPageState extends State<HubPage> {
+  final BluetoothService _bluetoothService = BluetoothService();
+  StreamSubscription<bool>? _connectionSubscription;
+  bool _isConnected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isConnected = _bluetoothService.isConnected;
+    _connectionSubscription =
+        _bluetoothService.connectionStateStream.listen((isConnected) {
+      if (mounted) {
+        if (_isConnected && !isConnected) {
+          // 从连接到断开
+          _showDisconnectedDialog();
+        }
+        setState(() {
+          _isConnected = isConnected;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectionSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _showDisconnectedDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('蓝牙连接已断开'),
+        content: const Text('您的设备已与蓝牙模块断开连接，请手动重新连接。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,6 +65,9 @@ class HubPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('功能中心'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          _buildConnectionStatus(),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -74,6 +130,28 @@ class HubPage extends StatelessWidget {
             onTap: () {
               _showComingSoon(context, '码垛搬运机器人');
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConnectionStatus() {
+    return Padding(
+      padding: const EdgeInsets.only(right: 16.0),
+      child: Row(
+        children: [
+          Icon(
+            _isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+            color: _isConnected ? Colors.blue : Colors.grey,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _isConnected ? '已连接' : '未连接',
+            style: TextStyle(
+              color: _isConnected ? Colors.blue : Colors.grey,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),

@@ -122,8 +122,20 @@ class _BluetoothDiscoveryPageState extends State<BluetoothDiscoveryPage> {
       _isConnecting = true;
     });
 
-    bool connected = await _bluetoothService.connectToDevice(_selectedDevice!);
-    
+    bool connected = false;
+    const int maxRetries = 3;
+    for (int i = 0; i < maxRetries; i++) {
+      print('正在尝试连接... (第 ${i + 1} 次)');
+      connected = await _bluetoothService.connectToDevice(_selectedDevice!);
+      if (connected) {
+        break; // 连接成功，退出循环
+      }
+      // 如果不是最后一次尝试，等待一会再重试
+      if (i < maxRetries - 1) {
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+    }
+
     if (mounted) {
       if (connected) {
         _showSnackBar('BLE连接成功: ${_selectedDevice!.name ?? '未知设备'}');
@@ -143,8 +155,12 @@ class _BluetoothDiscoveryPageState extends State<BluetoothDiscoveryPage> {
 
   void _showSnackBar(String message) {
     if (mounted) {
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
+        SnackBar(
+          content: Text(message),
+          duration: const Duration(milliseconds: 1500),
+        ),
       );
     }
   }
@@ -276,8 +292,35 @@ class _BluetoothDiscoveryPageState extends State<BluetoothDiscoveryPage> {
             ),
             const SizedBox(height: 16),
             
+            // 连接后锁定列表的提示
+            if (_isConnected)
+              Container(
+                margin: const EdgeInsets.only(bottom: 8.0),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.lock_outline, color: Colors.green.shade700, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '列表已锁定，请先断开连接以选择其他设备。',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: Colors.green.shade800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            
             // 设备选择提示
-            if (_selectedDevice != null)
+            if (_selectedDevice != null && !_isConnected)
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -382,31 +425,30 @@ class _BluetoothDiscoveryPageState extends State<BluetoothDiscoveryPage> {
   Widget _buildDeviceListTile(UnifiedBluetoothDevice device) {
     bool isSelected = _selectedDevice?.address == device.address;
     bool hasName = device.name != null && device.name!.isNotEmpty;
+    bool isTheConnectedDevice = _isConnected && _bluetoothService.connectedDevice?.address == device.address;
     
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      elevation: isSelected ? 4 : 1,
-      color: isSelected ? Colors.blue.shade50 : null,
+      elevation: isSelected && !_isConnected ? 4 : 1,
+      color: isTheConnectedDevice ? Colors.green.shade50 : (_isConnected ? Colors.grey.shade100 : (isSelected ? Colors.blue.shade50 : null)),
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.blue.shade100 : Colors.grey.shade100,
+            color: isTheConnectedDevice ? Colors.green.shade100 : (_isConnected ? Colors.grey.shade200 : (isSelected ? Colors.blue.shade100 : Colors.grey.shade100)),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Icon(
-            hasName ? Icons.bluetooth : Icons.bluetooth_disabled,
-            color: isSelected 
-                ? Colors.blue.shade700 
-                : (hasName ? Colors.blue.shade400 : Colors.grey.shade600),
+            isTheConnectedDevice ? Icons.bluetooth_connected : (hasName ? Icons.bluetooth : Icons.bluetooth_disabled),
+            color: isTheConnectedDevice ? Colors.green.shade700 : (_isConnected ? Colors.grey.shade500 : (isSelected ? Colors.blue.shade700 : (hasName ? Colors.blue.shade400 : Colors.grey.shade600))),
             size: 20,
           ),
         ),
         title: Text(
           device.name ?? '未知BLE设备',
           style: TextStyle(
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? Colors.blue.shade800 : null,
+            fontWeight: (isSelected && !_isConnected) || isTheConnectedDevice ? FontWeight.bold : FontWeight.normal,
+            color: isTheConnectedDevice ? Colors.green.shade800 : (_isConnected ? Colors.grey.shade600 : (isSelected ? Colors.blue.shade800 : null)),
           ),
         ),
         subtitle: Column(
@@ -414,7 +456,7 @@ class _BluetoothDiscoveryPageState extends State<BluetoothDiscoveryPage> {
           children: [
             Text(
               '地址: ${device.address}',
-              style: const TextStyle(fontSize: 12),
+              style: TextStyle(fontSize: 12, color: _isConnected && !isTheConnectedDevice ? Colors.grey.shade500 : null),
             ),
             const SizedBox(height: 2),
             Container(
@@ -434,14 +476,16 @@ class _BluetoothDiscoveryPageState extends State<BluetoothDiscoveryPage> {
             ),
           ],
         ),
-        trailing: isSelected 
+        trailing: isTheConnectedDevice 
             ? Icon(Icons.check_circle, 
-                   color: Colors.blue.shade700, 
+                   color: Colors.green.shade700, 
                    size: 24)
-            : Icon(Icons.radio_button_unchecked, 
+            : (isSelected && !_isConnected
+              ? Icon(Icons.check_circle, color: Colors.blue.shade700, size: 24)
+              : Icon(Icons.radio_button_unchecked, 
                    color: Colors.grey.shade400,
-                   size: 24),
-        onTap: () {
+                   size: 24)),
+        onTap: _isConnected ? null : () {
           setState(() {
             _selectedDevice = isSelected ? null : device;
           });

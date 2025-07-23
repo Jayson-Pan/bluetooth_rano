@@ -150,8 +150,12 @@ class _BluetoothCommunicationPageState extends State<BluetoothCommunicationPage>
 
   void _showSnackBar(String message) {
     if (mounted) {
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
+        SnackBar(
+          content: Text(message),
+          duration: const Duration(milliseconds: 1500),
+        ),
       );
     }
   }

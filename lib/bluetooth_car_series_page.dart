@@ -67,10 +67,11 @@ class _BluetoothCarSeriesPageState extends State<BluetoothCarSeriesPage> {
                 _buttonCommands = defaultCommands;
               });
               Navigator.pop(context);
+              ScaffoldMessenger.of(context).removeCurrentSnackBar();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('已恢复默认设置'),
-                  duration: Duration(seconds: 2),
+                  duration: Duration(milliseconds: 1500),
                   backgroundColor: Colors.orange,
                 ),
               );
@@ -279,10 +280,11 @@ class _BluetoothCarSeriesPageState extends State<BluetoothCarSeriesPage> {
               _saveSettings(); // 保存到本地存储
               Navigator.pop(context);
               // 显示保存成功的提示
+              ScaffoldMessenger.of(context).removeCurrentSnackBar();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('按钮 ${getButtonName(buttonKey)} 的命令已保存'),
-                  duration: Duration(seconds: 2),
+                  duration: const Duration(milliseconds: 1500),
                   backgroundColor: Colors.green,
                 ),
               );

@@ -79,10 +79,11 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
                 _buttonCommands = defaultCommands;
               });
               Navigator.pop(context);
+              ScaffoldMessenger.of(context).removeCurrentSnackBar();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('已恢复默认设置'),
-                  duration: Duration(seconds: 2),
+                  duration: Duration(milliseconds: 1500),
                   backgroundColor: Colors.orange,
                 ),
               );
@@ -253,10 +254,11 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
               });
               _saveSettings(); // 保存到本地存储
               Navigator.pop(context);
+              ScaffoldMessenger.of(context).removeCurrentSnackBar();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('按钮 ${buttonKey.toUpperCase()} 的命令已保存'),
-                  duration: Duration(seconds: 2),
+                  duration: const Duration(milliseconds: 1500),
                   backgroundColor: Colors.green,
                 ),
               );
@@ -865,10 +867,11 @@ class _CustomizeButtonsScreenState extends State<CustomizeButtonsScreen> {
               // 保存到本地存储
               SettingsManager.saveRobotFighterSettings(_buttonCommands);
               Navigator.pop(context);
+              ScaffoldMessenger.of(context).removeCurrentSnackBar();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('按钮 ${_buttonInfo[buttonKey]?['label'] ?? buttonKey} 的命令已保存'),
-                  duration: Duration(seconds: 2),
+                  duration: const Duration(milliseconds: 1500),
                   backgroundColor: Colors.green,
                 ),
               );

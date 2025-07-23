@@ -409,6 +409,13 @@ class BluetoothService {
   // 连接到BLE设备
   Future<bool> connectToDevice(UnifiedBluetoothDevice device) async {
     try {
+      // 在连接前，确保扫描已停止，并给予短暂延迟
+      if (fbp.FlutterBluePlus.isScanningNow) {
+        await fbp.FlutterBluePlus.stopScan();
+        await Future.delayed(const Duration(milliseconds: 200));
+        print('扫描已停止，准备连接...');
+      }
+
       if (device.device == null) {
         print('设备对象为空');
         return false;
@@ -430,7 +437,10 @@ class BluetoothService {
         _connectionStateController.add(connected);
         
         if (!connected) {
+          print('检测到蓝牙断开，执行清理...');
           _cleanup();
+          _connectedDevice = null;
+          connectedDevice = null;
         }
       });
       
@@ -578,7 +588,7 @@ class BluetoothService {
       
     } catch (e) {
       print('BLE连接失败: $e');
-      _cleanup();
+      await disconnect();
       return false;
     }
   }
