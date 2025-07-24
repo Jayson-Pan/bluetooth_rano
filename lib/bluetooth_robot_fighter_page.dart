@@ -17,7 +17,7 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
   
   bool _isConnected = false;
   bool _isCustomizeMode = false; // 按钮自定义模式
-  Timer? _sendTimer; // 长按定时器
+  Map<String, Timer> _sendTimers = {}; // 修改：为每个按键独立管理定时器
   Set<String> _pressedButtons = {}; // 记录按下的按钮
   
   // 轮播背景相关
@@ -103,7 +103,8 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
   void dispose() {
     _setPortraitOrientation();
     _connectionSubscription?.cancel();
-    _sendTimer?.cancel();
+    _sendTimers.values.forEach((timer) => timer.cancel());
+    _sendTimers.clear();
     _backgroundTimer?.cancel();
     _pageController.dispose();
     super.dispose();
@@ -207,7 +208,7 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
     
     String command = _buttonCommands[buttonKey] ?? '';
     if (command.isNotEmpty && _isConnected) {
-      _sendTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      _sendTimers[buttonKey] = Timer.periodic(const Duration(milliseconds: 100), (timer) {
         _sendCommand(command);
       });
     }
@@ -215,8 +216,8 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
 
   // 处理长按结束
   void _onButtonLongPressEnd(String buttonKey) {
-    _sendTimer?.cancel();
-    _sendTimer = null;
+    _sendTimers[buttonKey]?.cancel();
+    _sendTimers.remove(buttonKey);
     
     // 移除按下状态
     setState(() {

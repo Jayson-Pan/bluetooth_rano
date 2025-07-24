@@ -17,7 +17,7 @@ class _BluetoothCarSeriesPageState extends State<BluetoothCarSeriesPage> {
   
   bool _isConnected = false;
   bool _isCustomizeMode = false; // 按钮自定义模式
-  Timer? _sendTimer; // 长按定时器
+  Map<String, Timer> _sendTimers = {}; // 修改：为每个按键独立管理定时器
   Set<String> _pressedButtons = {}; // 记录按下的按钮
   
   // 按钮命令映射
@@ -90,7 +90,8 @@ class _BluetoothCarSeriesPageState extends State<BluetoothCarSeriesPage> {
   @override
   void dispose() {
     _connectionSubscription?.cancel();
-    _sendTimer?.cancel();
+    _sendTimers.values.forEach((timer) => timer.cancel());
+    _sendTimers.clear();
     super.dispose();
   }
 
@@ -164,7 +165,7 @@ class _BluetoothCarSeriesPageState extends State<BluetoothCarSeriesPage> {
     
     String command = _buttonCommands[buttonKey] ?? '';
     if (command.isNotEmpty && _isConnected) {
-      _sendTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      _sendTimers[buttonKey] = Timer.periodic(const Duration(milliseconds: 100), (timer) {
         _sendCommand(command);
       });
     }
@@ -172,8 +173,8 @@ class _BluetoothCarSeriesPageState extends State<BluetoothCarSeriesPage> {
 
   // 处理长按结束
   void _onButtonLongPressEnd(String buttonKey) {
-    _sendTimer?.cancel();
-    _sendTimer = null;
+    _sendTimers[buttonKey]?.cancel();
+    _sendTimers.remove(buttonKey);
     
     // 移除按下状态
     setState(() {
