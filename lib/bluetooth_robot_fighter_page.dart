@@ -16,9 +16,8 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
   StreamSubscription<bool>? _connectionSubscription;
   
   bool _isConnected = false;
-  bool _isCustomizeMode = false; // 按钮自定义模式
-  Map<String, Timer> _sendTimers = {}; // 修改：为每个按键独立管理定时器
-  Set<String> _pressedButtons = {}; // 记录按下的按钮
+  Map<String, Timer> _sendTimers = {};
+  Set<String> _pressedButtons = {};
   
   // 轮播背景相关
   late PageController _pageController;
@@ -33,6 +32,10 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
   
   // 按钮命令映射
   Map<String, String> _buttonCommands = {};
+  
+  // 舵机角度
+  double _servo1Angle = 90.0;
+  double _servo2Angle = 90.0;
 
   @override
   void initState() {
@@ -74,7 +77,7 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
           ElevatedButton(
             onPressed: () async {
               await SettingsManager.resetRobotFighterSettings();
-              final defaultCommands = SettingsManager.getDefaultCommands();
+              final defaultCommands = SettingsManager.getDefaultRobotFighterCommands();
               setState(() {
                 _buttonCommands = defaultCommands;
               });
@@ -170,15 +173,12 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
 
   // 处理按钮按下
   void _onButtonPressed(String buttonKey) {
-    // 添加按下反馈
     setState(() {
       _pressedButtons.add(buttonKey);
     });
     
-    // 震动反馈
     HapticFeedback.lightImpact();
     
-    // 延迟移除按下状态
     Timer(const Duration(milliseconds: 150), () {
       if (mounted) {
         setState(() {
@@ -187,21 +187,14 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
       }
     });
     
-    if (_isCustomizeMode) {
-      _showCustomizeDialog(buttonKey);
-    } else {
-      String command = _buttonCommands[buttonKey] ?? '';
-      if (command.isNotEmpty) {
-        _sendCommand(command);
-      }
+    String command = _buttonCommands[buttonKey] ?? '';
+    if (command.isNotEmpty) {
+      _sendCommand(command);
     }
   }
 
   // 处理长按开始
   void _onButtonLongPressStart(String buttonKey) {
-    if (_isCustomizeMode) return;
-    
-    // 添加长按反馈
     setState(() {
       _pressedButtons.add(buttonKey);
     });
@@ -219,7 +212,6 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
     _sendTimers[buttonKey]?.cancel();
     _sendTimers.remove(buttonKey);
     
-    // 移除按下状态
     setState(() {
       _pressedButtons.remove(buttonKey);
     });
@@ -234,7 +226,7 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('自定义按钮: ${buttonKey.toUpperCase()}'),
+        title: Text('自定义按钮: ${_getButtonDisplayName(buttonKey)}'),
         content: TextField(
           controller: controller,
           decoration: const InputDecoration(
@@ -253,12 +245,12 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
               setState(() {
                 _buttonCommands[buttonKey] = controller.text;
               });
-              _saveSettings(); // 保存到本地存储
+              _saveSettings();
               Navigator.pop(context);
               ScaffoldMessenger.of(context).removeCurrentSnackBar();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('按钮 ${buttonKey.toUpperCase()} 的命令已保存'),
+                  content: Text('按钮 ${_getButtonDisplayName(buttonKey)} 的命令已保存'),
                   duration: const Duration(milliseconds: 1500),
                   backgroundColor: Colors.green,
                 ),
@@ -269,6 +261,24 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
         ],
       ),
     );
+  }
+
+  // 获取按钮显示名称
+  String _getButtonDisplayName(String buttonKey) {
+    switch (buttonKey) {
+      case 'forward': return '前进';
+      case 'backward': return '后退';
+      case 'left': return '左转';
+      case 'right': return '右转';
+      case 'forward_left': return '左前';
+      case 'forward_right': return '右前';
+      case 'backward_left': return '左后';
+      case 'backward_right': return '右后';
+      case 'mode': return 'MODE';
+      case 'servo1': return '舵机1';
+      case 'servo2': return '舵机2';
+      default: return buttonKey.toUpperCase();
+    }
   }
 
   // 跳转到竖屏自定义界面
@@ -283,7 +293,6 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
       ),
     );
     
-    // 确保返回时是横屏
     await Future.delayed(const Duration(milliseconds: 200));
     if (mounted) {
       SystemChrome.setPreferredOrientations([
@@ -293,7 +302,6 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
     }
     
     if (result != null && result is Map<String, String>) {
-      // 延迟更新状态，等待屏幕方向稳定
       await Future.delayed(const Duration(milliseconds: 100));
       if (mounted) {
         setState(() {
@@ -314,10 +322,15 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('🤖 格斗模式：', style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('• 点击方向键控制机器人移动'),
+              Text('🎮 遥控模式：', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text('• 左侧9个按钮控制机器人移动方向'),
               Text('• 长按方向键连续发送命令'),
-              Text('• F1-F9按钮默认发送1-9字符'),
+              Text('• 中心MODE按钮切换运动模式'),
+              SizedBox(height: 12),
+              Text('🎛️ 舵机控制：', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text('• 右上方滑条调节舵机角度(0-180°)'),
+              Text('• 点击发送按钮执行舵机命令'),
+              Text('• 右下方按钮快速设置舵机到90°'),
               SizedBox(height: 12),
               Text('⚙️ 自定义模式：', style: TextStyle(fontWeight: FontWeight.bold)),
               Text('• 点击"按钮自定义"进入竖屏编辑模式'),
@@ -327,10 +340,6 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
               Text('🔗 连接要求：', style: TextStyle(fontWeight: FontWeight.bold)),
               Text('• 需要先在"BLE发现"页面连接设备'),
               Text('• 连接状态会在左上角显示'),
-              SizedBox(height: 12),
-              Text('⌨️ 默认按键：', style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('• 方向键: ↑(F) ↓(B) ←(L) →(R)'),
-              Text('• 功能键: F1(1) F2(2) ... F9(9)'),
             ],
           ),
         ),
@@ -347,7 +356,7 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: false, // 避免键盘影响布局
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           // 轮播背景
@@ -394,30 +403,38 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
                   _buildTopBar(),
                   const SizedBox(height: 12),
                   
-                  // 主控制区域 - 使用对称布局
+                  // 主控制区域
                   Expanded(
                     child: Row(
                       children: [
-                        // 左侧区域：上下方向键
+                        // 左侧区域：9个方向控制按钮
                         Expanded(
-                          flex: 2,
-                          child: _buildDirectionControls(),
+                          flex: 1,
+                          child: _buildDirectionControlGrid(),
                         ),
                         
                         const SizedBox(width: 16),
                         
-                        // 中间区域：F1-F9按钮
+                        // 右侧区域
                         Expanded(
-                          flex: 4,
-                          child: _buildFunctionButtons(),
-                        ),
-                        
-                        const SizedBox(width: 16),
-                        
-                        // 右侧区域：左右方向键
-                        Expanded(
-                          flex: 2,
-                          child: _buildLeftRightControls(),
+                          flex: 1,
+                          child: Column(
+                            children: [
+                              // 右上：舵机角度控制
+                              Expanded(
+                                flex: 4,
+                                child: _buildServoControls(),
+                              ),
+                              
+                              const SizedBox(height: 4),
+                              
+                              // 右下：舵机功能按钮
+                              SizedBox(
+                                height: 55,
+                                child: _buildServoButtons(),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -533,7 +550,7 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
         // 按钮自定义切换
         Container(
           decoration: BoxDecoration(
-            color: Colors.amber.withValues(alpha: 0.9), // 金黄色作为红色主题的反差色
+            color: Colors.amber.withValues(alpha: 0.9),
             borderRadius: BorderRadius.circular(20),
           ),
           child: ElevatedButton.icon(
@@ -555,117 +572,41 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
     );
   }
 
-  // 左侧方向控制
-  Widget _buildDirectionControls() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        // 上
-        _buildControlButton(
-          'up',
-          Icons.keyboard_arrow_up,
-          '↑',
-          isDirectional: true,
-        ),
-        // 下
-        _buildControlButton(
-          'down',
-          Icons.keyboard_arrow_down,
-          '↓',
-          isDirectional: true,
-        ),
-      ],
-    );
-  }
-
-  // 右侧左右控制
-  Widget _buildLeftRightControls() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        // 左
-        _buildControlButton(
-          'left',
-          Icons.keyboard_arrow_left,
-          '←',
-          isDirectional: true,
-        ),
-        // 右
-        _buildControlButton(
-          'right',
-          Icons.keyboard_arrow_right,
-          '→',
-          isDirectional: true,
-        ),
-      ],
-    );
-  }
-
-  // 中间F1-F9按钮
-  Widget _buildFunctionButtons() {
+  // 左侧9个方向控制按钮网格
+  Widget _buildDirectionControlGrid() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // 计算可用空间，减去间距
-        double availableHeight = constraints.maxHeight;
-        double availableWidth = constraints.maxWidth;
-        
-        // 计算按钮大小，确保不溢出
-        double buttonHeight = (availableHeight - 40) / 3; // 3行，减去间距
-        double buttonWidth = (availableWidth - 40) / 3; // 3列，减去间距
-        double buttonSize = buttonHeight < buttonWidth ? buttonHeight : buttonWidth;
-        
-        // 确保按钮不会太小
-        buttonSize = buttonSize < 60 ? 60 : buttonSize;
+        double size = (constraints.maxHeight - 40) / 3; // 3x3网格
+        size = size > 80 ? 80 : size; // 限制最大尺寸
         
         return Column(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            // 第一行：F1, F2, F3
+            // 第一行：左前、前进、右前
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                for (int i = 1; i <= 3; i++)
-                  SizedBox(
-                    width: buttonSize,
-                    height: buttonSize,
-                    child: _buildControlButton(
-                      'f$i',
-                      Icons.circle,
-                      'F$i',
-                    ),
-                  ),
+                _buildDirectionButton('forward_left', Icons.north_west, '', size),
+                _buildDirectionButton('forward', Icons.keyboard_arrow_up, '', size),
+                _buildDirectionButton('forward_right', Icons.north_east, '', size),
               ],
             ),
-            // 第二行：F4, F5, F6
+            // 第二行：左转、MODE、右转
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                for (int i = 4; i <= 6; i++)
-                  SizedBox(
-                    width: buttonSize,
-                    height: buttonSize,
-                    child: _buildControlButton(
-                      'f$i',
-                      Icons.circle,
-                      'F$i',
-                    ),
-                  ),
+                _buildDirectionButton('left', Icons.keyboard_arrow_left, '', size),
+                _buildDirectionButton('mode', Icons.autorenew, 'MODE', size, isMode: true),
+                _buildDirectionButton('right', Icons.keyboard_arrow_right, '', size),
               ],
             ),
-            // 第三行：F7, F8, F9
+            // 第三行：左后、后退、右后
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                for (int i = 7; i <= 9; i++)
-                  SizedBox(
-                    width: buttonSize,
-                    height: buttonSize,
-                    child: _buildControlButton(
-                      'f$i',
-                      Icons.circle,
-                      'F$i',
-                    ),
-                  ),
+                _buildDirectionButton('backward_left', Icons.south_west, '', size),
+                _buildDirectionButton('backward', Icons.keyboard_arrow_down, '', size),
+                _buildDirectionButton('backward_right', Icons.south_east, '', size),
               ],
             ),
           ],
@@ -674,13 +615,8 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
     );
   }
 
-  // 构建控制按钮 - 红色主题
-  Widget _buildControlButton(
-    String buttonKey,
-    IconData icon,
-    String label, {
-    bool isDirectional = false,
-  }) {
+  // 方向控制按钮
+  Widget _buildDirectionButton(String buttonKey, IconData? icon, String label, double size, {bool isMode = false}) {
     String command = _buttonCommands[buttonKey] ?? '';
     bool hasCommand = command.isNotEmpty;
     bool isPressed = _pressedButtons.contains(buttonKey);
@@ -692,16 +628,16 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
       onLongPressCancel: () => _onButtonLongPressEnd(buttonKey),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
-        width: isDirectional ? 100 : null,
-        height: isDirectional ? 100 : null,
-        transform: Matrix4.identity()..scale(isPressed ? 0.95 : 1.0), // 按下时缩放
+        width: size,
+        height: size,
+        transform: Matrix4.identity()..scale(isPressed ? 0.95 : 1.0),
         decoration: BoxDecoration(
           color: isPressed
-            ? Colors.yellow.withValues(alpha: 0.9) // 按下时变亮黄色
-            : _isCustomizeMode 
-              ? Colors.amber.withValues(alpha: 0.8) // 自定义模式用金黄色
+            ? Colors.yellow.withValues(alpha: 0.9)
+            : isMode
+              ? Colors.orange.withValues(alpha: 0.8) // MODE按钮特殊颜色
               : (hasCommand && _isConnected 
-                ? Colors.red.withValues(alpha: 0.8) // 红色主题
+                ? Colors.red.withValues(alpha: 0.8)
                 : Colors.black.withValues(alpha: 0.4)),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
@@ -718,47 +654,251 @@ class _BluetoothRobotFighterPageState extends State<BluetoothRobotFighterPage> {
             ),
           ] : null,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(4),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
               Icon(
                 icon,
                 color: isPressed ? Colors.red.shade700 : Colors.white,
-                size: isDirectional ? 24 : 18,
+                size: isMode ? 20 : 24,
               ),
-              const SizedBox(height: 2),
-              Flexible(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: isPressed ? Colors.red.shade700 : Colors.white,
-                    fontSize: isDirectional ? 14 : 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
+              if (label.isNotEmpty) const SizedBox(height: 4),
+            ],
+            if (label.isNotEmpty) ...[
+              Text(
+                label,
+                style: TextStyle(
+                  color: isPressed ? Colors.red.shade700 : Colors.white,
+                  fontSize: isMode ? 10 : (icon != null ? 12 : 14),
+                  fontWeight: FontWeight.bold,
                 ),
+                textAlign: TextAlign.center,
               ),
-              if (command.isNotEmpty) ...[
-                const SizedBox(height: 1),
-                Flexible(
-                  child: Text(
-                    command,
-                    style: TextStyle(
-                      color: isPressed ? Colors.red.shade600 : Colors.white70,
-                      fontSize: 8,
+            ],
+            if (command.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                command,
+                style: TextStyle(
+                  color: isPressed ? Colors.red.shade600 : Colors.white70,
+                  fontSize: 8,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 右上舵机控制组件
+  Widget _buildServoControls() {
+    return Column(
+      children: [
+        // 舵机1控制
+        Expanded(
+          child: _buildServoControl(
+            title: '舵机角度 1',
+            angle: _servo1Angle,
+            onChanged: (value) {
+              setState(() {
+                _servo1Angle = value;
+              });
+            },
+            onSend: () {
+              _sendCommand('servo${_servo1Angle.round()}');
+            },
+          ),
+        ),
+        
+        const SizedBox(height: 2),
+        
+        // 舵机2控制
+        Expanded(
+          child: _buildServoControl(
+            title: '舵机角度 2',
+            angle: _servo2Angle,
+            onChanged: (value) {
+              setState(() {
+                _servo2Angle = value;
+              });
+            },
+            onSend: () {
+              _sendCommand('servo${_servo2Angle.round()}');
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 单个舵机控制组件
+  Widget _buildServoControl({
+    required String title,
+    required double angle,
+    required ValueChanged<double> onChanged,
+    required VoidCallback onSend,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            '${angle.round()}°',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Flexible(
+            child: Row(
+              children: [
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: Colors.red.withValues(alpha: 0.8),
+                      inactiveTrackColor: Colors.white.withValues(alpha: 0.3),
+                      thumbColor: Colors.red,
+                      overlayColor: Colors.red.withValues(alpha: 0.2),
+                      trackHeight: 1.5,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
                     ),
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    child: Slider(
+                      value: angle,
+                      min: 0,
+                      max: 180,
+                      divisions: 180,
+                      onChanged: onChanged,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                SizedBox(
+                  height: 28,
+                  width: 48,
+                  child: ElevatedButton(
+                    onPressed: _isConnected ? onSend : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.withValues(alpha: 0.8),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    ),
+                    child: const Text('发送', style: TextStyle(fontSize: 9)),
                   ),
                 ),
               ],
-            ],
+            ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // 右下舵机功能按钮
+  Widget _buildServoButtons() {
+    return Row(
+      children: [
+        // 舵机1按钮
+        Expanded(
+          child: _buildServoFunctionButton('servo1', '舵机1'),
+        ),
+        const SizedBox(width: 12),
+        // 舵机2按钮
+        Expanded(
+          child: _buildServoFunctionButton('servo2', '舵机2'),
+        ),
+      ],
+    );
+  }
+
+  // 舵机功能按钮
+  Widget _buildServoFunctionButton(String buttonKey, String label) {
+    String command = _buttonCommands[buttonKey] ?? '';
+    bool hasCommand = command.isNotEmpty;
+    bool isPressed = _pressedButtons.contains(buttonKey);
+    
+    return GestureDetector(
+      onTap: () => _onButtonPressed(buttonKey),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 100),
+        height: 55,
+        transform: Matrix4.identity()..scale(isPressed ? 0.95 : 1.0),
+        decoration: BoxDecoration(
+          color: isPressed
+            ? Colors.yellow.withValues(alpha: 0.9)
+            : (hasCommand && _isConnected 
+              ? Colors.red.withValues(alpha: 0.8)
+              : Colors.black.withValues(alpha: 0.4)),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isPressed 
+              ? Colors.red.withValues(alpha: 0.8)
+              : Colors.white.withValues(alpha: 0.3),
+            width: isPressed ? 3 : 2,
+          ),
+          boxShadow: isPressed ? [
+            BoxShadow(
+              color: Colors.red.withValues(alpha: 0.5),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ] : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.settings_input_antenna,
+              color: isPressed ? Colors.red.shade700 : Colors.white,
+              size: 20,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                color: isPressed ? Colors.red.shade700 : Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            if (command.isNotEmpty) ...[
+              const SizedBox(height: 1),
+              Text(
+                command,
+                style: TextStyle(
+                  color: isPressed ? Colors.red.shade600 : Colors.white70,
+                  fontSize: 7,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -785,26 +925,23 @@ class _CustomizeButtonsScreenState extends State<CustomizeButtonsScreen> {
 
   // 按钮信息映射
   final Map<String, Map<String, dynamic>> _buttonInfo = {
-    'up': {'label': '上 ↑', 'icon': Icons.keyboard_arrow_up, 'description': '向上移动'},
-    'down': {'label': '下 ↓', 'icon': Icons.keyboard_arrow_down, 'description': '向下移动'},
-    'left': {'label': '左 ←', 'icon': Icons.keyboard_arrow_left, 'description': '向左移动'},
-    'right': {'label': '右 →', 'icon': Icons.keyboard_arrow_right, 'description': '向右移动'},
-    'f1': {'label': 'F1', 'icon': Icons.looks_one, 'description': '功能键1'},
-    'f2': {'label': 'F2', 'icon': Icons.looks_two, 'description': '功能键2'},
-    'f3': {'label': 'F3', 'icon': Icons.looks_3, 'description': '功能键3'},
-    'f4': {'label': 'F4', 'icon': Icons.looks_4, 'description': '功能键4'},
-    'f5': {'label': 'F5', 'icon': Icons.looks_5, 'description': '功能键5'},
-    'f6': {'label': 'F6', 'icon': Icons.looks_6, 'description': '功能键6'},
-    'f7': {'label': 'F7', 'icon': Icons.filter_7, 'description': '功能键7'},
-    'f8': {'label': 'F8', 'icon': Icons.filter_8, 'description': '功能键8'},
-    'f9': {'label': 'F9', 'icon': Icons.filter_9, 'description': '功能键9'},
+    'forward': {'label': '前进 ↑', 'icon': Icons.keyboard_arrow_up, 'description': '机器人前进'},
+    'backward': {'label': '后退 ↓', 'icon': Icons.keyboard_arrow_down, 'description': '机器人后退'},
+    'left': {'label': '左转 ←', 'icon': Icons.keyboard_arrow_left, 'description': '机器人左转'},
+    'right': {'label': '右转 →', 'icon': Icons.keyboard_arrow_right, 'description': '机器人右转'},
+    'forward_left': {'label': '左前 ↖', 'icon': Icons.north_west, 'description': '机器人左前移动'},
+    'forward_right': {'label': '右前 ↗', 'icon': Icons.north_east, 'description': '机器人右前移动'},
+    'backward_left': {'label': '左后 ↙', 'icon': Icons.south_west, 'description': '机器人左后移动'},
+    'backward_right': {'label': '右后 ↘', 'icon': Icons.south_east, 'description': '机器人右后移动'},
+    'mode': {'label': 'MODE', 'icon': Icons.autorenew, 'description': '切换运动模式'},
+    'servo1': {'label': '舵机1', 'icon': Icons.settings_input_antenna, 'description': '舵机1控制'},
+    'servo2': {'label': '舵机2', 'icon': Icons.settings_input_antenna, 'description': '舵机2控制'},
   };
 
   @override
   void initState() {
     super.initState();
     _buttonCommands = Map.from(widget.buttonCommands);
-    // 设置竖屏
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -813,7 +950,6 @@ class _CustomizeButtonsScreenState extends State<CustomizeButtonsScreen> {
 
   @override
   void dispose() {
-    // 立即恢复横屏，但使用Future.microtask避免在dispose过程中的冲突
     Future.microtask(() {
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.landscapeLeft,
@@ -865,7 +1001,6 @@ class _CustomizeButtonsScreenState extends State<CustomizeButtonsScreen> {
               setState(() {
                 _buttonCommands[buttonKey] = controller.text;
               });
-              // 保存到本地存储
               SettingsManager.saveRobotFighterSettings(_buttonCommands);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).removeCurrentSnackBar();
@@ -888,12 +1023,10 @@ class _CustomizeButtonsScreenState extends State<CustomizeButtonsScreen> {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        // 在返回前确保屏幕方向设置正确
         SystemChrome.setPreferredOrientations([
           DeviceOrientation.landscapeLeft,
           DeviceOrientation.landscapeRight,
         ]);
-        // 短暂延迟确保方向变化开始
         await Future.delayed(const Duration(milliseconds: 50));
         return true;
       },
@@ -903,7 +1036,6 @@ class _CustomizeButtonsScreenState extends State<CustomizeButtonsScreen> {
         backgroundColor: const Color(0xFFDC2626),
         foregroundColor: Colors.white,
         actions: [
-          // 连接状态指示
           Container(
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -951,9 +1083,9 @@ class _CustomizeButtonsScreenState extends State<CustomizeButtonsScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFDC2626), // 红色
-              Color(0xFFB91C1C), // 深红色
-              Color(0xFF991B1B), // 更深红色
+              Color(0xFFDC2626),
+              Color(0xFFB91C1C),
+              Color(0xFF991B1B),
             ],
           ),
         ),
@@ -962,7 +1094,6 @@ class _CustomizeButtonsScreenState extends State<CustomizeButtonsScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // 说明文字
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
@@ -986,7 +1117,7 @@ class _CustomizeButtonsScreenState extends State<CustomizeButtonsScreen> {
                       ),
                       SizedBox(height: 8),
                       Text(
-                        '• 点击下方按钮可编辑发送的命令\n• 支持单个字符或字符串\n• 编辑完成后点击返回按钮保存',
+                        '• 点击下方按钮可编辑发送的命令\n• 支持单个字符或字符串\n• 舵机角度控制发送"servo+角度"\n• 编辑完成后点击返回按钮保存',
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: 14,
@@ -998,7 +1129,6 @@ class _CustomizeButtonsScreenState extends State<CustomizeButtonsScreen> {
                 
                 const SizedBox(height: 20),
                 
-                // 按钮列表
                 Expanded(
                   child: ListView.builder(
                     itemCount: _buttonInfo.length,
@@ -1019,7 +1149,6 @@ class _CustomizeButtonsScreenState extends State<CustomizeButtonsScreen> {
                               padding: const EdgeInsets.all(16),
                               child: Row(
                                 children: [
-                                  // 按钮图标
                                   Container(
                                     width: 48,
                                     height: 48,
@@ -1036,7 +1165,6 @@ class _CustomizeButtonsScreenState extends State<CustomizeButtonsScreen> {
                                   
                                   const SizedBox(width: 16),
                                   
-                                  // 按钮信息
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1085,7 +1213,6 @@ class _CustomizeButtonsScreenState extends State<CustomizeButtonsScreen> {
                                     ),
                                   ),
                                   
-                                  // 编辑图标
                                   Icon(
                                     Icons.edit,
                                     color: Colors.grey[400],
@@ -1103,9 +1230,9 @@ class _CustomizeButtonsScreenState extends State<CustomizeButtonsScreen> {
               ],
             ),
           ),
-                  ),
         ),
       ),
+    ),
     );
   }
 }

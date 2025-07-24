@@ -21,6 +21,24 @@ class SettingsManager {
     'f9': '9',
   };
 
+  // 机器人格斗模式默认按钮命令映射
+  static const Map<String, String> _defaultRobotFighterCommands = {
+    // 9个方向控制按钮
+    'forward': '1',        // 前进
+    'backward': '2',       // 后退
+    'left': '3',           // 左转
+    'right': '4',          // 右转
+    'forward_left': '5',   // 左前
+    'forward_right': '6',  // 右前
+    'backward_left': '7',  // 左后
+    'backward_right': '8', // 右后
+    'mode': '0',           // 模式切换（中心按钮）
+    
+    // 2个舵机功能按钮
+    'servo1': '90',        // 舵机1
+    'servo2': '90',        // 舵机2
+  };
+
   // 保存小车系列按钮设置
   static Future<void> saveCarSeriesSettings(Map<String, String> commands) async {
     final prefs = await SharedPreferences.getInstance();
@@ -62,8 +80,8 @@ class SettingsManager {
     final prefs = await SharedPreferences.getInstance();
     Map<String, String> commands = {};
     
-    for (String key in _defaultCommands.keys) {
-      commands[key] = prefs.getString('$_robotFighterPrefix$key') ?? _defaultCommands[key]!;
+    for (String key in _defaultRobotFighterCommands.keys) {
+      commands[key] = prefs.getString('$_robotFighterPrefix$key') ?? _defaultRobotFighterCommands[key]!;
     }
     
     return commands;
@@ -72,7 +90,7 @@ class SettingsManager {
   // 恢复格斗机器人系列默认设置
   static Future<void> resetRobotFighterSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    for (String key in _defaultCommands.keys) {
+    for (String key in _defaultRobotFighterCommands.keys) {
       await prefs.remove('$_robotFighterPrefix$key');
     }
   }
@@ -80,5 +98,10 @@ class SettingsManager {
   // 获取默认命令
   static Map<String, String> getDefaultCommands() {
     return Map.from(_defaultCommands);
+  }
+
+  // 获取机器人格斗模式默认命令
+  static Map<String, String> getDefaultRobotFighterCommands() {
+    return Map.from(_defaultRobotFighterCommands);
   }
 } 
